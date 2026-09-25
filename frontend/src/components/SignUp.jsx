@@ -305,6 +305,24 @@ const handleSubmit = async (e) => {
               )}
             </motion.button>
 
+            <motion.div
+              variants={itemVariants}
+              className="text-center space-y-4"
+            >
+              <p className="text-gray-400 text-sm">Or continue with</p>
+              <motion.button
+                type="button"
+                onClick={() => {
+                  window.location.href = 'http://localhost:3000/api/users/auth/google';
+                }}
+                className="w-full py-2 px-4 bg-[#2a3441] rounded-lg text-sm text-gray-400 hover:bg-[#343d4a] transition-all duration-300"
+                whileHover={{ scale: 1.02, backgroundColor: "#343d4a" }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Google
+              </motion.button>
+            </motion.div>
+
             <motion.div 
               variants={itemVariants}
               className="text-center"

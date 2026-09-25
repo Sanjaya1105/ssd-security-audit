@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import axiosInstance from '../config/axiosConfig';
@@ -7,12 +7,28 @@ import loginImg1 from '../assets/images/img 2.jpg';
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (searchParams.get('oauth') !== 'error') return;
+
+    const reason = searchParams.get('reason');
+    const messages = {
+      google_not_configured: 'Google sign-in is not configured.',
+      invalid_state: 'Google sign-in could not be verified. Please try again.',
+      email_not_verified: 'Your Google email is not verified.',
+      google_error: 'Google sign-in was cancelled or denied.',
+    };
+    const message = messages[reason] || 'Google sign-in failed. Please try again.';
+    setError(message);
+    toast.error(message);
+  }, [searchParams]);
 
   const handleChange = (e) => {
     setFormData({
@@ -245,6 +261,9 @@ const Login = () => {
               <div className="grid grid-cols-2 gap-3">
                 <motion.button
                   type="button"
+                  onClick={() => {
+                    window.location.href = 'http://localhost:3000/api/users/auth/google';
+                  }}
                   className="py-2 px-4 bg-[#2a3441] rounded-lg text-sm text-gray-400 hover:bg-[#343d4a] transition-all duration-300"
                   whileHover={{ scale: 1.02, backgroundColor: "#343d4a" }}
                   whileTap={{ scale: 0.98 }}

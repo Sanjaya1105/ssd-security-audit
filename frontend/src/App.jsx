@@ -5,6 +5,7 @@ import Navbar from "./components/Navbar";
 import Home from "./components/Home";
 import Login from "./components/Login";
 import SignUp from "./components/SignUp";
+import AuthGoogleCallback from "./components/AuthGoogleCallback";
 import ForgetPassword from "./components/ForgetPassword";
 import VerificationCode from "./components/VerificationCode";
 import ResetPassword from "./components/ResetPassword";
@@ -57,6 +58,7 @@ const App = () => {
   const hideNavbarPaths = [
     "/login",
     "/signup",
+    "/auth",
     "/forget-password",
     "/verify-code",
     "/reset-password",
@@ -106,6 +108,7 @@ const App = () => {
         <Route path="/feedback" element={<Feedback />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/auth/google/callback" element={<AuthGoogleCallback />} />
         <Route path="/forget-password" element={<ForgetPassword />} />
         <Route path="/verify-code" element={<VerificationCode />} />
         <Route path="/reset-password" element={<ResetPassword />} />

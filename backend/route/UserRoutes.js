@@ -1,5 +1,6 @@
 const express = require("express");
 const userController = require("../controller/UserController");
+const googleAuthController = require("../controller/googleAuthController");
 const { authenticateUser } = require('../middleware/AuthMiddleware');
 
 const router = express.Router();
@@ -11,8 +12,11 @@ router.post("/logout", userController.logout); // Logout User
 router.post("/forget-password", userController.forgetPassword); // Forget Password
 router.post("/verify-code", userController.verifyCode); // Verify Code
 router.post("/reset-password", userController.resetPassword); // Reset Password
+router.get("/auth/google", googleAuthController.startGoogleLogin);
+router.get("/auth/google/callback", googleAuthController.handleGoogleCallback);
 
 // Protected Routes
+router.get("/me", authenticateUser, googleAuthController.getMe);
 router.get("/users", authenticateUser, userController.getUsers); // Get All Users
 router.get("/users/:id", authenticateUser, userController.getUserById); // Get User by ID
 router.get("/users/role/:role", authenticateUser, userController.getUsersByRole); // Get Users by Role
