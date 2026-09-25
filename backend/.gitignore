@@ -1,0 +1,16 @@
+# Ignore node modules
+node_modules/
+
+# Ignore environment config
+.env
+
+# Logs
+*.log
+logs/
+
+# VS Code settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
