@@ -220,7 +220,7 @@ const checkInventoryForProduction = async (db, items) => {
 //         }
 //     } catch (error) {
 //         console.error('Error creating order:', error);
-//         res.status(500).json({ message: 'Error creating order', error: error.message });
+//         res.status(500).json({ message: 'Error creating order'});
 //     }
 // };
 
@@ -266,7 +266,7 @@ const getAllOrders = async (req, res) => {
         res.json(ordersWithItems);
     } catch (error) {
         console.error('Error fetching orders:', error);
-        res.status(500).json({ message: 'Error fetching orders', error: error.message });
+        res.status(500).json({ message: 'Error fetching orders'});
     }
 };
 
@@ -327,7 +327,7 @@ const getOrder = async (req, res) => {
   
     } catch (error) {
       console.error('Error fetching order:', error);
-      res.status(500).json({ message: 'Error fetching order', error: error.message });
+      res.status(500).json({ message: 'Error fetching order'});
     }
   };
   
@@ -365,7 +365,7 @@ const getUserOrders = async (req, res) => {
         res.json(ordersWithItems);
     } catch (error) {
         console.error('Error fetching user orders:', error);
-        res.status(500).json({ message: 'Error fetching user orders', error: error.message });
+        res.status(500).json({ message: 'Error fetching user orders'});
     }
 };
 
@@ -805,44 +805,44 @@ const handleOrderFlow = async (req, res) => {
             );
             const order_id = orderResult.insertId;
 
-            // 2. Insert order items and (for DIRECT_SALE) deduct stock
+            // 2. Insert order items. Card sales only check stock here;
+            // deduction happens after Stripe confirms payment (A06).
+            const paidUpfront = String(payment_method).toUpperCase() === 'CASH';
+
             for (const item of items) {
-                // Insert order-product relationship
                 await db.promise().execute(
                     'INSERT INTO order_product (order_id, product_id, quantity) VALUES (?, ?, ?)',
                     [order_id, item.product_id, item.quantity]
                 );
 
-                // 🆕 Handle stock deduction if order_type is DIRECT_SALE
                 if (order_type === 'DIRECT_SALE') {
                     const [stockRows] = await db.promise().execute(
                         'SELECT stock_id, quantity_available FROM product_stock WHERE product_id = ? ORDER BY last_updated DESC LIMIT 1',
                         [item.product_id]
                     );
 
-                    if (stockRows.length > 0) {
-                        const currentStock = stockRows[0].quantity_available;
+                    if (stockRows.length === 0) {
+                        await db.promise().rollback();
+                        return res.status(400).json({
+                            message: `No stock record found for product ID ${item.product_id}`
+                        });
+                    }
+
+                    const currentStock = stockRows[0].quantity_available;
+                    if (currentStock < item.quantity) {
+                        await db.promise().rollback();
+                        return res.status(400).json({
+                            message: `Not enough stock for product ID ${item.product_id}. Available: ${currentStock}, Requested: ${item.quantity}`
+                        });
+                    }
+
+                    if (paidUpfront) {
                         const newStock = currentStock - item.quantity;
-
-                        if (newStock < 0) {
-                            await db.promise().rollback();
-                            return res.status(400).json({ 
-                                message: `Not enough stock for product ID ${item.product_id}. Available: ${currentStock}, Requested: ${item.quantity}`
-                            });
-                        }
-
-                        // Update product_stock
                         await db.promise().execute(
                             'UPDATE product_stock SET quantity_available = ?, last_updated = NOW() WHERE stock_id = ?',
                             [newStock, stockRows[0].stock_id]
                         );
-
                         console.log(`✅ Stock updated for product ID ${item.product_id}: ${currentStock} -> ${newStock}`);
-                    } else {
-                        await db.promise().rollback();
-                        return res.status(400).json({ 
-                            message: `No stock record found for product ID ${item.product_id}`
-                        });
                     }
                 }
             }
@@ -912,7 +912,7 @@ const handleOrderFlow = async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error in order flow:', error);
-        res.status(500).json({ message: 'Order creation failed', error: error.message });
+        res.status(500).json({ message: 'Order creation failed'});
     }
 };
 
@@ -965,9 +965,7 @@ const getRecentProductionOrders = async (req, res) => {
         console.error('Error fetching recent production orders:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching recent production orders',
-            error: error.message
-        });
+            message: 'Error fetching recent production orders'});
     }
 };
 
@@ -1024,9 +1022,7 @@ const getAllOrdersForAdmin = async (req, res) => {
         console.error('Error fetching all orders:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching orders',
-            error: error.message
-        });
+            message: 'Error fetching orders'});
     }
 };
 
@@ -1112,9 +1108,7 @@ const getOrdersByDateRange = async (req, res) => {
         console.error('Error fetching orders by date range:', error);
         res.status(500).json({ 
             success: false,
-            message: 'Error fetching orders by date range', 
-            error: error.message 
-        });
+            message: 'Error fetching orders by date range'});
     }
 };
 
@@ -1191,9 +1185,7 @@ const updateOrderStatus = async (req, res) => {
         console.error('Error updating order:', error);
         res.status(500).json({
             success: false,
-            message: 'Error updating order',
-            error: error.message
-        });
+            message: 'Error updating order'});
     }
 };
 
@@ -1283,13 +1275,43 @@ const deleteOrder = async (req, res) => {
         console.error('❌ Error deleting order:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting order',
-            error: error.message
-        });
+            message: 'Error deleting order'});
     }
 };
 
 
+
+const deductDirectSaleStock = async (db, order_id) => {
+    const [items] = await db.promise().execute(
+        'SELECT product_id, quantity FROM order_product WHERE order_id = ?',
+        [order_id]
+    );
+
+    for (const item of items) {
+        const [stockRows] = await db.promise().execute(
+            'SELECT stock_id, quantity_available FROM product_stock WHERE product_id = ? ORDER BY last_updated DESC LIMIT 1 FOR UPDATE',
+            [item.product_id]
+        );
+
+        if (stockRows.length === 0) {
+            throw new Error(`No stock record found for product ID ${item.product_id}`);
+        }
+
+        const currentStock = Number(stockRows[0].quantity_available);
+        const newStock = currentStock - Number(item.quantity);
+
+        if (newStock < 0) {
+            throw new Error(
+                `Not enough stock for product ID ${item.product_id}. Available: ${currentStock}, Requested: ${item.quantity}`
+            );
+        }
+
+        await db.promise().execute(
+            'UPDATE product_stock SET quantity_available = ?, last_updated = NOW() WHERE stock_id = ?',
+            [newStock, stockRows[0].stock_id]
+        );
+    }
+};
 
 const processOrder = async (db, order_id) => {
     const releases = await db.query(`
@@ -1352,7 +1374,7 @@ const processProductionOrder = async (req, res) => {
         res.status(200).json({ message: 'Production order processed successfully!' });
     } catch (error) {
         console.error('❌ Error processing production order:', error);
-        res.status(500).json({ message: 'Failed to process production order', error: error.message });
+        res.status(500).json({ message: 'Failed to process production order'});
     }
 };
 
@@ -1373,6 +1395,7 @@ module.exports = {
     // updateOrder,
     deleteOrder,
     processOrder,
+    deductDirectSaleStock,
     processProductionOrder,
     updateOrderStatus
 };
