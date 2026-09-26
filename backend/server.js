@@ -6,9 +6,9 @@ const cors = require('cors');
 const { exec } = require('child_process');
 
 const cron = require('node-cron');
-const axios = require('axios');
+const { authenticateUser, authorizeRole } = require('./middleware/AuthMiddleware');
 
-
+const managersOnly = [authenticateUser, authorizeRole(['admin', 'manager'])];
 
 const userRoutes = require("./route/UserRoutes");
 const feedbackRoutes = require("./route/FeedbackRoutes");
@@ -26,6 +26,17 @@ const productInventoryReleaseRoutes = require("./route/ProductInventoryReleaseRo
 const predictSalesRoute = require('./route/predictSales');
 
 const app = express();
+
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
 
 // Other middleware
 app.use(express.json());
@@ -82,20 +93,19 @@ app.use('/api', predictSalesRoute);
 
 
 // ✅ TRAIN MODEL API
-app.get('/train-model', (req, res) => {
-  exec(
-    `python AI_MODEL_REAL_ONE/train_model.py`,
-    (err, stdout, stderr) => {
-      if (err) {
-        return res.status(500).json({ error: stderr || err.message });
-      }
-      console.log(stdout);
-      res.json({ message: '✅ Model trained successfully!' });
-    }
-  );
+app.get('/train-model', ...managersOnly, async (req, res) => {
+  try {
+    const stdout = await runPythonScript('train_model.py');
+    console.log(stdout);
+    res.json({ message: 'Model trained successfully!' });
+  } catch (err) {
+    console.error('Model training failed:', err);
+    res.status(500).json({ error: 'Model training failed' });
+  }
 });
 
-app.get('/predict', (req, res) => {
+
+app.get('/predict', ...managersOnly, async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: "Date is required" });
 
@@ -116,15 +126,13 @@ app.get('/predict', (req, res) => {
 });
 
 // 🧠 Schedule job to run daily at 2:00 AM
-cron.schedule('* * * * *', async () => {  // runs every minute
+cron.schedule('0 2 * * *', async () => { // runs every minute
   try {
-    console.log("🕑 Running daily model training...");
-
-    const response = await axios.get('http://localhost:3000/train-model');
-
-    console.log("✅ Daily model training response:", response.data);
+    console.log('Running scheduled model training...');
+    const stdout = await runPythonScript('train_model.py');
+    console.log('Scheduled model training finished:', stdout);
   } catch (error) {
-    console.error("❌ Error in daily model training:", error.message);
+    console.error('Scheduled model training failed:', error.message);
   }
 });
 
