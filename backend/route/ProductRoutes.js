@@ -14,7 +14,7 @@ const {
 } = require("../controller/ProductController");
 
 // Create new product (Manager and Admin only)
-router.post("/", authenticateUser, createProduct);
+router.post("/", ...managers, createProduct);
 
 // Get all products
 router.get("/", getAllProducts);

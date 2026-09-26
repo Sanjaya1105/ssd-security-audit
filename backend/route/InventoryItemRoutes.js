@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { authenticateUser } = require("../middleware/AuthMiddleware");
+const { authenticateUser, authorizeRole } = require("../middleware/AuthMiddleware");
 const {
     createItem,
     getAllItems,
@@ -12,28 +12,16 @@ const {
     createCategory
 } = require("../controller/InventoryItemController");
 
-// Create new item (Manager and Admin only)
-router.post("/", authenticateUser, createItem);
+const managers = [authenticateUser, authorizeRole(["admin", "manager"])];
+const staff = [authenticateUser, authorizeRole(["admin", "manager", "cashier"])];
 
-// Create new category (Manager and Admin only)
-router.post("/categories", authenticateUser, createCategory);
+router.post("/", ...managers, createItem);
+router.post("/categories", ...managers, createCategory);
+router.get("/", ...staff, getAllItems);
+router.get("/categories", ...staff, getAllCategories);
+router.get("/category/:category", ...staff, getItemsByCategory);
+router.get("/:itemId", ...staff, getItemById);
+router.put("/:itemId", ...managers, updateItem);
+router.delete("/:itemId", ...managers, deleteItem);
 
-// Get all items
-router.get("/", authenticateUser, getAllItems);
-
-// Get all categories
-router.get("/categories", authenticateUser, getAllCategories);
-
-// Get items by category
-router.get("/category/:category", authenticateUser, getItemsByCategory);
-
-// Get item by ID
-router.get("/:itemId", authenticateUser, getItemById);
-
-// Update item (Manager and Admin only)
-router.put("/:itemId", authenticateUser, updateItem);
-
-// Delete item (Manager and Admin only)
-router.delete("/:itemId", authenticateUser, deleteItem);
-
-module.exports = router; 
+module.exports = router;

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { authenticateUser } = require("../middleware/AuthMiddleware");
+const { authenticateUser, authorizeRole } = require("../middleware/AuthMiddleware");
 const {
     createInventoryRelease,
     getAllInventoryReleases,

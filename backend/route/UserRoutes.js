@@ -1,7 +1,7 @@
 const express = require("express");
 const userController = require("../controller/UserController");
 const googleAuthController = require("../controller/googleAuthController");
-const { authenticateUser } = require('../middleware/AuthMiddleware');
+const { authenticateUser, optionalAuthenticate, authorizeRole } = require("../middleware/AuthMiddleware");
 
 const router = express.Router();
 

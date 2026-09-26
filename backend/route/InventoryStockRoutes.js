@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { authenticateUser } = require("../middleware/AuthMiddleware");
+const { authenticateUser, authorizeRole } = require("../middleware/AuthMiddleware");
 const {
     createStock,
     getAllStock,
@@ -12,28 +12,16 @@ const {
     getStockAnalytics
 } = require("../controller/InventoryStockController");
 
-// Create new stock entry (Manager and Admin only)
-router.post("/", authenticateUser, createStock);
+const managers = [authenticateUser, authorizeRole(["admin", "manager"])];
+const staff = [authenticateUser, authorizeRole(["admin", "manager", "cashier"])];
 
-// Get all stock entries
-router.get("/", authenticateUser, getAllStock);
+router.post("/", ...managers, createStock);
+router.get("/", ...staff, getAllStock);
+router.get("/analytics", ...staff, getStockAnalytics);
+router.get("/total/:itemId", ...staff, getTotalStockByItemId);
+router.get("/item/:itemId", ...staff, getStockByItemId);
+router.get("/:stockId", ...staff, getStockById);
+router.put("/:stockId", ...managers, updateStock);
+router.delete("/:stockId", ...managers, deleteStock);
 
-// Get stock analytics
-router.get("/analytics", authenticateUser, getStockAnalytics);
-
-// Get total available stock for an item
-router.get("/total/:itemId", authenticateUser, getTotalStockByItemId);
-
-// Get stock entries by item ID
-router.get("/item/:itemId", authenticateUser, getStockByItemId);
-
-// Get stock entry by ID
-router.get("/:stockId", authenticateUser, getStockById);
-
-// Update stock quantity (Manager and Admin only)
-router.put("/:stockId", authenticateUser, updateStock);
-
-// Delete stock entry (Manager and Admin only)
-router.delete("/:stockId", authenticateUser, deleteStock);
-
-module.exports = router; 
+module.exports = router;
