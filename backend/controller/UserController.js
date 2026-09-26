@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const { sendVerificationCode } = require("../utils/emailService");
@@ -34,6 +35,16 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS
   }
 });
+
+const isValidResetCode = (user, code) => {
+    if (!user || !user.reset_code || !user.reset_code_expiry) {
+        return false;
+    }
+    const now = new Date();
+    const expiryTime = new Date(user.reset_code_expiry);
+    return now <= expiryTime && String(user.reset_code) === String(code);
+};
+
 
 // ✅ Create a New User (Auto-Increment `user_id`)
 exports.createUser = async (req, res) => {
@@ -345,6 +356,8 @@ exports.forgetPassword = async (req, res) => {
       if (results.length === 0) {
         logSecurityEvent("PASSWORD_RESET_REQUEST", { email, found: false }, req);
         return res.status(200).json(genericMessage);
+        logSecurityEvent("PASSWORD_RESET_REQUEST", { email, found: false }, req);
+        return res.status(200).json(genericMessage);
       }
 
       const verificationCode = crypto.randomInt(100000, 1000000).toString();
@@ -358,6 +371,11 @@ exports.forgetPassword = async (req, res) => {
 
           try {
             await sendVerificationCode(email, verificationCode);
+            logSecurityEvent("PASSWORD_RESET_REQUEST", { email, found: true }, req);
+            res.status(200).json(genericMessage);
+          } catch (mailErr) {
+            console.error("Error sending verification email:", mailErr);
+            res.status(500).json({ message: "Failed to send verification email" });
             logSecurityEvent("PASSWORD_RESET_REQUEST", { email, found: true }, req);
             res.status(200).json(genericMessage);
           } catch (mailErr) {
@@ -383,7 +401,11 @@ exports.verifyCode = async (req, res) => {
       [email],
       (err, results) => {
         if (err) return res.status(500).json({ message: "Server Error" });
+        if (err) return res.status(500).json({ message: "Server Error" });
 
+        if (results.length === 0 || !isValidResetCode(results[0], code)) {
+          logSecurityEvent("RESET_CODE_FAILURE", { email }, req);
+          return res.status(400).json({ message: "Invalid or expired verification code" });
         if (results.length === 0 || !isValidResetCode(results[0], code)) {
           logSecurityEvent("RESET_CODE_FAILURE", { email }, req);
           return res.status(400).json({ message: "Invalid or expired verification code" });
@@ -401,8 +423,29 @@ exports.verifyCode = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
+    const { email, code, newPassword } = req.body;
     const db = req.db;
 
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ message: "Email, verification code, and new password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    }
+
+    db.execute(
+      "SELECT reset_code, reset_code_expiry FROM user WHERE email = ?",
+      [email],
+      async (err, results) => {
+        if (err) return res.status(500).json({ message: "Server Error" });
+
+        if (results.length === 0 || !isValidResetCode(results[0], code)) {
+          logSecurityEvent("PASSWORD_RESET_FAILURE", { email }, req);
+          return res.status(400).json({ message: "Invalid or expired verification code" });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
     if (!email || !code || !newPassword) {
       return res.status(400).json({ message: "Email, verification code, and new password are required" });
     }
@@ -433,9 +476,20 @@ exports.resetPassword = async (req, res) => {
             res.status(200).json({ success: true, message: "Password reset successfully" });
           }
         );
+        db.execute(
+          "UPDATE user SET password = ?, reset_code = NULL, reset_code_expiry = NULL WHERE email = ?",
+          [hashedPassword, email],
+          (updateErr) => {
+            if (updateErr) return res.status(500).json({ message: "Server Error" });
+            logSecurityEvent("PASSWORD_RESET_SUCCESS", { email }, req);
+            res.status(200).json({ success: true, message: "Password reset successfully" });
+          }
+        );
       }
     );
   } catch (error) {
     res.status(500).json({ message: "Server Error"});
+    res.status(500).json({ message: "Server Error"});
   }
 };
+

@@ -2,16 +2,19 @@ const express = require("express");
 const userController = require("../controller/UserController");
 const googleAuthController = require("../controller/googleAuthController");
 const { authenticateUser, optionalAuthenticate, authorizeRole } = require("../middleware/AuthMiddleware");
+const { rateLimiter } = require("../middleware/rateLimiter");
 
 const router = express.Router();
+const authLimit = rateLimiter({ windowMs: 15 * 60 * 1000, max: 8, action: "auth" });
+
 
 // Public Routes
 router.post("/register", userController.createUser); // Create User
-router.post("/login", userController.login); // Login User
+router.post("/login", authLimit, userController.login);
 router.post("/logout", userController.logout); // Logout User
-router.post("/forget-password", userController.forgetPassword); // Forget Password
-router.post("/verify-code", userController.verifyCode); // Verify Code
-router.post("/reset-password", userController.resetPassword); // Reset Password
+router.post("/forget-password", authLimit, userController.forgetPassword);
+router.post("/verify-code", authLimit, userController.verifyCode);
+router.post("/reset-password", authLimit, userController.resetPassword);
 router.get("/auth/google", googleAuthController.startGoogleLogin);
 router.get("/auth/google/callback", googleAuthController.handleGoogleCallback);
 
