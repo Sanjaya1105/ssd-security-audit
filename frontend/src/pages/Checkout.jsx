@@ -191,15 +191,11 @@ const Checkout = () => {
 
       setOrderId(orderResponse.data.order_id);
 
-      // Then create payment intent
-      const total = calculateTotal();
+      // Payment amount is taken from the order on the server, not from the client
       const response = await axios.post(
         'http://localhost:3000/api/payments/create-payment-intent',
         {
-          amount: Math.round(total * 100), // Convert to cents and ensure it's an integer
-          order_id: orderResponse.data.order_id, // Pass the order ID to link payment with order
-          currency: 'usd',
-          payment_method_types: ['card']
+          order_id: orderResponse.data.order_id
         },
         {
           withCredentials: true,
@@ -230,6 +226,12 @@ const Checkout = () => {
         navigate('/login');
         return;
       }
+
+      await axios.post(
+        `http://localhost:3000/api/payments/${paymentIntent.id}/confirm`,
+        { order_id: orderId },
+        { withCredentials: true }
+      );
 
       toast.success('Payment completed successfully!');
       navigate(`/order-confirmation/${orderId}`, { 

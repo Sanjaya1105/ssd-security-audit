@@ -57,8 +57,28 @@ const OrderConfirmation = () => {
   };
 
   useEffect(() => {
-    fetchOrder();
-  }, [id]);
+    const confirmIfReturnedFromStripe = async () => {
+      const paymentIntentId = searchParams.get('payment_intent');
+      const redirectStatus = searchParams.get('redirect_status');
+      const cleanOrderId = id?.split('?')[0];
+
+      if (paymentIntentId && redirectStatus === 'succeeded' && cleanOrderId) {
+        try {
+          await axios.post(
+            `http://localhost:3000/api/payments/${paymentIntentId}/confirm`,
+            { order_id: cleanOrderId },
+            { withCredentials: true }
+          );
+        } catch (err) {
+          console.error('Error confirming returned payment:', err);
+        }
+      }
+
+      fetchOrder();
+    };
+
+    confirmIfReturnedFromStripe();
+  }, [id, searchParams]);
 
   if (loading) {
     return (
