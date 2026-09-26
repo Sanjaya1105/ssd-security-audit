@@ -2,14 +2,34 @@ const express = require('express');
 const { PythonShell } = require('python-shell');
 const { authenticateUser, authorizeRole } = require('../middleware/AuthMiddleware');
 
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+
+function isSafeIsoDate(value) {
+  if (typeof value !== 'string' || !DATE_ONLY.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
+
+router.post('/predict-sales', authenticateUser, authorizeRole(['admin', 'manager']), (req, res) => {
 router.post('/predict-sales', authenticateUser, authorizeRole(['admin', 'manager']), (req, res) => {
   const { sale_date } = req.body;
-  console.log('Running Python script...');
+  if (!isSafeIsoDate(sale_date)) {
+    return res.status(400).json({ message: 'sale_date must be a valid YYYY-MM-DD value' });
+  }
 
   let options = {
     mode: 'text',
     pythonOptions: ['-u'],
-    scriptPath: './ml_models', // path where predict_sales.py is located
+    scriptPath: './ml_models',
     args: [sale_date]
   };
 
@@ -18,7 +38,6 @@ router.post('/predict-sales', authenticateUser, authorizeRole(['admin', 'manager
       console.error('Prediction Error:', err);
       return res.status(500).send('Prediction error');
     }
-    console.log('Python Result:', results);  // <-- ADD THIS
     res.json({ predicted_quantity: results[0] });
   });
 });

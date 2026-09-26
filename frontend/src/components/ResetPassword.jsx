@@ -13,14 +13,17 @@ const ResetPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const navigate = useNavigate();
+    const [code, setCode] = useState('');
 
   useEffect(() => {
     const resetEmail = sessionStorage.getItem('resetEmail');
-    if (!resetEmail) {
+    const resetCode = sessionStorage.getItem('resetCode');
+    if (!resetEmail || !resetCode) {
       navigate('/forget-password');
       return;
     }
     setEmail(resetEmail);
+    setCode(resetCode);
   }, [navigate]);
 
   const handleChange = (e) => {
@@ -50,6 +53,7 @@ const ResetPassword = () => {
       const response = await axios.post('http://localhost:3000/api/users/reset-password', 
         {
           email,
+             code,
           newPassword: passwords.newPassword
         },
         { withCredentials: true }
@@ -58,6 +62,7 @@ const ResetPassword = () => {
       if (response.data.success) {
         toast.success('Password reset successfully!');
         sessionStorage.removeItem('resetEmail');
+                sessionStorage.removeItem('resetCode');
         navigate('/login');
       }
     } catch (error) {
