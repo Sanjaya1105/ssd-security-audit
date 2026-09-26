@@ -3,12 +3,9 @@ const mysql = require('mysql2');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
-const { exec } = require('child_process');
-
+const { execFile } = require('child_process');
 const cron = require('node-cron');
 const axios = require('axios');
-
-
 
 const userRoutes = require("./route/UserRoutes");
 const feedbackRoutes = require("./route/FeedbackRoutes");
@@ -26,6 +23,41 @@ const productInventoryReleaseRoutes = require("./route/ProductInventoryReleaseRo
 const predictSalesRoute = require('./route/predictSales');
 
 const app = express();
+
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function isSafeIsoDate(value) {
+  if (typeof value !== 'string' || !DATE_ONLY.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
+
+function runPythonScript(scriptName, args = []) {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, 'AI_MODEL_REAL_ONE', scriptName);
+    execFile(
+      'python',
+      [scriptPath, ...args],
+      { cwd: __dirname, timeout: 120000, windowsHide: true },
+      (err, stdout) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(stdout);
+      }
+    );
+  });
+}
+
+
 
 // Other middleware
 app.use(express.json());
@@ -82,37 +114,32 @@ app.use('/api', predictSalesRoute);
 
 
 // ✅ TRAIN MODEL API
-app.get('/train-model', (req, res) => {
-  exec(
-    `python AI_MODEL_REAL_ONE/train_model.py`,
-    (err, stdout, stderr) => {
-      if (err) {
-        return res.status(500).json({ error: stderr || err.message });
-      }
-      console.log(stdout);
-      res.json({ message: '✅ Model trained successfully!' });
-    }
-  );
+app.get('/train-model', ...managersOnly, async (req, res) => {
+  try {
+    const stdout = await runPythonScript('train_model.py');
+    console.log(stdout);
+    res.json({ message: 'Model trained successfully!' });
+  } catch (err) {
+    console.error('Model training failed:', err);
+    res.status(500).json({ error: 'Model training failed' });
+  }
 });
 
-app.get('/predict', (req, res) => {
+app.get('/predict', ...managersOnly, async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: "Date is required" });
+  if (!isSafeIsoDate(date)) {
+    return res.status(400).json({ error: "Date must be a valid YYYY-MM-DD value" });
+  }
 
-  const scriptPath = `python AI_MODEL_REAL_ONE/predict.py ${date}`;
-
-  exec(scriptPath, (err, stdout, stderr) => {
-    if (err) {
-      return res.status(500).json({ error: stderr || err.message });
-    }
-
-    try {
-      const predictions = JSON.parse(stdout);
-      res.json(predictions);
-    } catch (e) {
-      res.status(500).json({ error: "Failed to parse model response" });
-    }
-  });
+  try {
+    const stdout = await runPythonScript('predict.py', [date]);
+    const predictions = JSON.parse(stdout);
+    res.json(predictions);
+  } catch (err) {
+    console.error('Prediction failed:', err);
+    res.status(500).json({ error: "Failed to generate prediction" });
+  }
 });
 
 // 🧠 Schedule job to run daily at 2:00 AM
@@ -127,26 +154,6 @@ cron.schedule('* * * * *', async () => {  // runs every minute
     console.error("❌ Error in daily model training:", error.message);
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Start Express Server
 app.listen(PORT, () => {
