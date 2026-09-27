@@ -9,7 +9,6 @@
 | --- | --- |
 | Original application | [Dunkit1/Hot-Fast](https://github.com/Dunkit1/Hot-Fast) |
 | Modified application | [Sanjaya1105/ssd-security-audit](https://github.com/Sanjaya1105/ssd-security-audit) |
-| Original baseline | **Pending: record the original commit hash and date used for the assessment.** The assignment requires the original code to predate the semester. |
 
 ## 2. Project Overview
 
