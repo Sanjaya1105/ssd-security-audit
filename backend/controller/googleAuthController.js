@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
+const { logSecurityEvent } = require("../utils/securityLogger");
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 const REDIRECT_URI =
@@ -16,7 +17,10 @@ function getOAuthClient() {
     );
 }
 
-function redirectWithError(res, reason){
+function redirectWithError(res, reason, req) {
+    if (req) {
+        logSecurityEvent("OAUTH_FAILURE", { reason }, req);
+    }
     const url = `${FRONTEND_URL}/login?oauth=error&reason=${encodeURIComponent(reason)}`;
     return res.redirect(url);
 }
@@ -80,7 +84,7 @@ function googlePhonePlaceholder(sub) {
 
 exports.startGoogleLogin = (req, res) => {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-        return redirectWithError(res, "google_not_configured");
+        return redirectWithError(res, "google_not_configured", req);
     }
 
     const state = crypto.randomBytes(24).toString("hex");
@@ -107,11 +111,11 @@ exports.handleGoogleCallback = async (req, res) => {
         const { code, state, error } = req.query;
 
         if (error) {
-            return redirectWithError(res, String(error),);
+            return redirectWithError(res, String(error), req);
         }
 
         if (!code || !state || state !== req.cookies.oauth_state) {
-            return redirectWithError(res, "invalid_state");
+            return redirectWithError(res, "invalid_state", req);
         }
 
         res.clearCookie("oauth_state", { path: "/" });
@@ -120,7 +124,7 @@ exports.handleGoogleCallback = async (req, res) => {
         const { tokens } = await client.getToken(String(code));
 
         if (!tokens.id_token) {
-            return redirectWithError(res, "missing_id_token");
+            return redirectWithError(res, "missing_id_token", req);
         }
 
         const ticket = await client.verifyIdToken({
@@ -130,7 +134,7 @@ exports.handleGoogleCallback = async (req, res) => {
 
         const payload = ticket.getPayload();
         if (!payload?.email || payload.email_verified === false) {
-            return redirectWithError(res, "email_not_verified");
+            return redirectWithError(res, "email_not_verified", req);
         }
 
         const db = req.db;
