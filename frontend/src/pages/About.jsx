@@ -124,7 +124,7 @@ const About = () => {
                         >
                             <h3 className="text-2xl font-semibold text-white mb-6">Elegant Atmosphere</h3>
                             <p className="text-white/60 mb-6">
-                                Our dining area is designed with your comfort in mind, featuring premium wooden furniture 
+                                Our dining test area is designed with your comfort in mind, featuring premium wooden furniture 
                                 and ambient lighting that creates the perfect environment for enjoying our delicious cuisine.
                             </p>
                         </motion.div>

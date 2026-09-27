@@ -7,14 +7,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 import joblib
+from db_config import mysql_config
 
-# 1. Connect to MySQL
-conn = mysql.connector.connect(
-    host='localhost',
-    user='root',
-    password='ni@123',
-    database='hotandfast2'
-)
+# 1. Connect to MySQL using credentials from backend/.env (not hardcoded)
+conn = mysql.connector.connect(**mysql_config())
 
 # 2. Run your SQL query
 query = """

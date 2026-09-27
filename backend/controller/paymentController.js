@@ -1,23 +1,48 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { processOrder } = require('./OrderController'); // Import processOrder
-const util = require('util'); // Make sure this is at the top
+const { processOrder, deductDirectSaleStock } = require('./OrderController');
+const util = require('util');
+const { logSecurityEvent } = require('../utils/securityLogger');
 
-// Create a payment intent
+// Charge the amount stored on the order — never a client-supplied price.
 exports.createPaymentIntent = async (req, res) => {
-    const { amount, order_id } = req.body;
+    const { order_id } = req.body;
     const user_id = req.user.user_id;
     const db = req.db;
 
-    if (!order_id || !amount) {
-        return res.status(400).json({ message: 'Order ID and amount are required' });
+    if (!order_id) {
+        return res.status(400).json({ message: 'Order ID is required' });
     }
 
     try {
-        // Start transaction
+        const [orderRows] = await db.promise().execute(
+            `SELECT order_id, user_id, total_amount, order_status
+             FROM orders WHERE order_id = ?`,
+            [order_id]
+        );
+
+        if (orderRows.length === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        const order = orderRows[0];
+
+        if (String(order.user_id) !== String(user_id)) {
+            logSecurityEvent("PAYMENT_DENIED", { order_id, reason: "not_owner" }, req);
+            return res.status(403).json({ message: 'You can only pay for your own orders' });
+        }
+
+        if (['COMPLETED', 'CANCELLED', 'DONE'].includes(order.order_status)) {
+            return res.status(400).json({ message: 'This order cannot be paid' });
+        }
+
+        const amount = Number(order.total_amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ message: 'Order has an invalid total' });
+        }
+
         await db.promise().beginTransaction();
 
         try {
-            // 1. Create Stripe PaymentIntent
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: Math.round(amount * 100),
                 currency: 'usd',
@@ -25,50 +50,41 @@ exports.createPaymentIntent = async (req, res) => {
                     enabled: true,
                 },
                 metadata: {
-                    order_id,
-                    user_id
+                    order_id: String(order_id),
+                    user_id: String(user_id)
                 }
             });
 
-            // 2. Create payment record
             await db.promise().execute(
                 'INSERT INTO payments (order_id, amount, payment_status, stripe_payment_intent_id) VALUES (?, ?, ?, ?)',
                 [order_id, amount, 'PENDING', paymentIntent.id]
             );
 
-            // 3. Update order status
             await db.promise().execute(
                 'UPDATE orders SET order_status = ? WHERE order_id = ?',
                 ['PROCESSING', order_id]
             );
 
-            // 4. 🔥 PROMISIFY db.query so processOrder can use await
-            const promisifiedDb = {
-                ...db,
-                query: util.promisify(db.query).bind(db)
-            };
-
-
-            // 4. ✅ Call processOrder to deduct inventory
-            await processOrder(promisifiedDb, order_id);
-
-            // 5. Commit everything
             await db.promise().commit();
 
-            // 6. Send client secret
-            res.json({
-                clientSecret: paymentIntent.client_secret
-            });
+            logSecurityEvent(
+                "PAYMENT_INTENT_CREATED",
+                { order_id, amount },
+                req
+            );
 
+            res.json({
+                clientSecret: paymentIntent.client_secret,
+                amount
+            });
         } catch (error) {
             await db.promise().rollback();
-            console.error('Error during payment and processing:', error);
-            res.status(500).json({ message: 'Payment creation or inventory processing failed', error: error.message });
+            console.error('Error during payment intent creation:', error);
+            res.status(500).json({ message: 'Payment creation failed'});
         }
-
     } catch (error) {
         console.error('Top-level payment intent creation error:', error);
-        res.status(500).json({ message: 'Error creating payment intent', error: error.message });
+        res.status(500).json({ message: 'Error creating payment intent'});
     }
 };
 
@@ -224,9 +240,7 @@ exports.getAllPayments = async (req, res) => {
         console.error('Error fetching payments:', error);
         res.status(500).json({ 
             success: false,
-            message: 'Error fetching payments',
-            error: error.message 
-        });
+            message: 'Error fetching payments'});
     }
 };
 
@@ -298,73 +312,103 @@ exports.getPaymentStatistics = async (req, res) => {
         console.error('Error fetching payment statistics:', error);
         res.status(500).json({ 
             success: false,
-            message: 'Error fetching payment statistics',
-            error: error.message 
-        });
+            message: 'Error fetching payment statistics'});
     }
 };
 
-// Confirm payment manually
+// Confirm payment only after Stripe says it succeeded, then deduct stock once.
 exports.confirmPayment = async (req, res) => {
     try {
         const { order_id } = req.body;
         const paymentIntentId = req.params.paymentIntentId;
         const db = req.db;
+        const user_id = req.user.user_id;
+
+        if (!order_id || !paymentIntentId) {
+            return res.status(400).json({ message: 'Order ID and payment intent are required' });
+        }
+
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        if (paymentIntent.status !== 'succeeded') {
+            logSecurityEvent(
+                "PAYMENT_CONFIRM_FAILED",
+                { order_id, paymentIntentId, reason: "not_succeeded" },
+                req
+            );
+            return res.status(400).json({ message: 'Payment has not succeeded' });
+        }
+
+        if (String(paymentIntent.metadata.order_id) !== String(order_id)) {
+            logSecurityEvent(
+                "ALERT_PAYMENT_MISMATCH",
+                { order_id, paymentIntentId, reason: "order_mismatch" },
+                req
+            );
+            return res.status(400).json({ message: 'Payment does not match this order' });
+        }
+
+        const [payRows] = await db.promise().execute(
+            'SELECT payment_id, payment_status FROM payments WHERE stripe_payment_intent_id = ?',
+            [paymentIntentId]
+        );
+
+        if (payRows.length === 0) {
+            return res.status(404).json({ message: 'Payment record not found' });
+        }
+
+        if (payRows[0].payment_status === 'COMPLETED') {
+            return res.json({ success: true, message: 'Payment already confirmed' });
+        }
+
+        const [orderRows] = await db.promise().execute(
+            'SELECT order_id, user_id, order_type FROM orders WHERE order_id = ?',
+            [order_id]
+        );
+
+        if (orderRows.length === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        const order = orderRows[0];
+        const isStaff = ['admin', 'manager', 'cashier'].includes(req.user.role);
+        if (String(order.user_id) !== String(user_id) && !isStaff) {
+            logSecurityEvent("PAYMENT_DENIED", { order_id, reason: "not_owner" }, req);
+            return res.status(403).json({ message: 'Access denied' });
+        }
 
         await db.promise().beginTransaction();
 
         try {
-            // Verify the payment intent with Stripe
-            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-            
-            if (paymentIntent.status !== 'succeeded') {
-                throw new Error('Payment has not succeeded');
+            if (order.order_type === 'DIRECT_SALE') {
+                await deductDirectSaleStock(db, order_id);
+                await db.promise().execute(
+                    'UPDATE orders SET order_status = ? WHERE order_id = ?',
+                    ['COMPLETED', order_id]
+                );
+            } else if (order.order_type === 'PRODUCTION_ORDER') {
+                const promisifiedDb = {
+                    ...db,
+                    query: util.promisify(db.query).bind(db)
+                };
+                await processOrder(promisifiedDb, order_id);
+                await db.promise().execute(
+                    'UPDATE orders SET order_status = ? WHERE order_id = ?',
+                    ['DONE', order_id]
+                );
             }
 
-            // Update payment status
             await db.promise().execute(
                 'UPDATE payments SET payment_status = ? WHERE stripe_payment_intent_id = ?',
                 ['COMPLETED', paymentIntentId]
             );
 
-            // Get order details
-            const [orderRows] = await db.promise().execute(
-                'SELECT order_type FROM orders WHERE order_id = ?',
-                [order_id]
-            );
-
-            if (orderRows.length > 0) {
-                const order = orderRows[0];
-                
-                if (order.order_type === 'DIRECT_SALE') {
-                    // For direct sales, update inventory immediately
-                    const [orderProducts] = await db.promise().execute(
-                        'SELECT product_id, quantity FROM order_product WHERE order_id = ?',
-                        [order_id]
-                    );
-
-                    for (const item of orderProducts) {
-                        await db.promise().execute(
-                            'UPDATE product SET stock_quantity = stock_quantity - ? WHERE product_id = ?',
-                            [item.quantity, item.product_id]
-                        );
-                    }
-
-                    // Update order status to COMPLETED for direct sales
-                    await db.promise().execute(
-                        'UPDATE orders SET order_status = ? WHERE order_id = ?',
-                        ['COMPLETED', order_id]
-                    );
-                // } else {
-                //     // Update order status to COMPLETED for production orders too
-                //     await db.promise().execute(
-                //         'UPDATE orders SET order_status = ? WHERE order_id = ?',
-                //         ['COMPLETED', order_id]
-                //     );
-                }
-            }
-
             await db.promise().commit();
+            logSecurityEvent(
+                "PAYMENT_CONFIRMED",
+                { order_id, paymentIntentId },
+                req
+            );
             res.json({ success: true, message: 'Payment confirmed successfully' });
         } catch (error) {
             await db.promise().rollback();
@@ -372,7 +416,7 @@ exports.confirmPayment = async (req, res) => {
         }
     } catch (error) {
         console.error('Error confirming payment:', error);
-        res.status(500).json({ message: 'Error confirming payment', error: error.message });
+        res.status(500).json({ message: 'Error confirming payment'});
     }
 };
 
@@ -447,9 +491,7 @@ exports.getPaymentDetails = async (req, res) => {
         console.error('Error fetching payment details:', error);
         res.status(500).json({ 
             success: false,
-            message: 'Error fetching payment details',
-            error: error.message 
-        });
+            message: 'Error fetching payment details'});
     }
 };
 
@@ -492,8 +534,6 @@ exports.getPaymentsByDateRange = async (req, res) => {
         console.error('Error fetching payments by date range:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Error fetching payments by date range',
-            error: error.message 
-        });
+            message: 'Error fetching payments by date range'});
     }
 }; 

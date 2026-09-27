@@ -1,35 +1,33 @@
-const jwt = require('jsonwebtoken');
+const hits = new Map();
+const { logSecurityEvent } = require("../utils/securityLogger");
 
-const authenticateUser = (req, res, next) => {
-    try {
-        const token = req.cookies.token || req.header("Authorization")?.replace("Bearer ", "");
-
-        if (!token) {
-            return res.status(401).json({ message: "Unauthorized: No token provided" });
-        }
-
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-            if (err) {
-                return res.status(401).json({ message: "Unauthorized: Invalid token" });
-            }
-
-            req.user = decoded; // Store user details in req.user
-            next(); // Continue to the next middleware or route
-        });
-    } catch (error) {
-        res.status(401).json({ message: "Unauthorized: Token verification failed" });
-    }
-};
-
-module.exports = authenticateUser;
-
-const authorizeRole = (roles) => {
+function rateLimiter({ windowMs = 15 * 60 * 1000, max = 8, action = "auth" } = {}) {
     return (req, res, next) => {
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
+        const key = `${action}:${req.ip}`;
+        const now = Date.now();
+        const record = hits.get(key) || { count: 0, resetAt: now + windowMs };
+
+        if (now > record.resetAt) {
+            record.count = 0;
+            record.resetAt = now + windowMs;
         }
+
+        record.count += 1;
+        hits.set(key, record);
+
+        if (record.count > max) {
+            logSecurityEvent(
+                "ALERT_RATE_LIMIT",
+                { action, attempts: record.count },
+                req
+            );
+            return res.status(429).json({
+                message: "Too many attempts. Please try again later."
+            });
+        }
+
         next();
     };
-};
+}
 
-module.exports = { authenticateUser, authorizeRole };
+module.exports = { rateLimiter };

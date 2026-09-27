@@ -312,7 +312,6 @@ const ProductionOrder = () => {
       const paymentResponse = await axios.post(
         "http://localhost:3000/api/payments/create-payment-intent",
         {
-          amount: order.total_amount,
           order_id: order.order_id,
         },
         {

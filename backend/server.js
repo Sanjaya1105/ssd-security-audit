@@ -4,29 +4,13 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const { execFile } = require('child_process');
+const path = require('path');
+
 const cron = require('node-cron');
-const axios = require('axios');
 const { authenticateUser, authorizeRole } = require('./middleware/AuthMiddleware');
+const { sanitizeResponses, notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 const managersOnly = [authenticateUser, authorizeRole(['admin', 'manager'])];
-
-const userRoutes = require("./route/UserRoutes");
-const feedbackRoutes = require("./route/FeedbackRoutes");
-const inventoryItemRoutes = require("./route/InventoryItemRoutes");
-const purchaseRoutes = require("./route/PurchaseRoutes");
-const inventoryStockRoutes = require("./route/InventoryStockRoutes");
-const productRoutes = require("./route/ProductRoutes");
-const InventoryReleaseRoutes = require("./route/InventoryReleaseRoutes");
-const OrderRoutes = require("./route/OrderRoutes");
-const productLogRoutes = require("./route/ProductLogRoutes");
-const recipeRoutes = require("./route/recipeRoutes");
-const paymentRoutes = require("./route/paymentRoutes");
-const saleRoutes = require("./route/saleRoutes");
-const productInventoryReleaseRoutes = require("./route/ProductInventoryReleaseRoutes");
-const predictSalesRoute = require('./route/predictSales');
-
-const app = express();
-
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -62,6 +46,28 @@ function runPythonScript(scriptName, args = []) {
 
 
 
+const userRoutes = require("./route/UserRoutes");
+const feedbackRoutes = require("./route/FeedbackRoutes");
+const inventoryItemRoutes = require("./route/InventoryItemRoutes");
+const purchaseRoutes = require("./route/PurchaseRoutes");
+const inventoryStockRoutes = require("./route/InventoryStockRoutes");
+const productRoutes = require("./route/ProductRoutes");
+const InventoryReleaseRoutes = require("./route/InventoryReleaseRoutes");
+const OrderRoutes = require("./route/OrderRoutes");
+const productLogRoutes = require("./route/ProductLogRoutes");
+const recipeRoutes = require("./route/recipeRoutes");
+const paymentRoutes = require("./route/paymentRoutes");
+const saleRoutes = require("./route/saleRoutes");
+const productInventoryReleaseRoutes = require("./route/ProductInventoryReleaseRoutes");
+const predictSalesRoute = require('./route/predictSales');
+
+const app = express();
+
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error("JWT_SECRET must be at least 32 random characters. Set it in backend/.env");
+  process.exit(1);
+}
+
 app.disable('x-powered-by');
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -72,11 +78,11 @@ app.use((req, res, next) => {
   next();
 });
 
-
 // Other middleware
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+app.use(sanitizeResponses);
 
 // CORS configuration - Must be before other middleware
 app.use(cors({
@@ -137,18 +143,7 @@ app.get('/train-model', ...managersOnly, async (req, res) => {
     console.error('Model training failed:', err);
     res.status(500).json({ error: 'Model training failed' });
   }
-app.get('/train-model', ...managersOnly, async (req, res) => {
-  try {
-    const stdout = await runPythonScript('train_model.py');
-    console.log(stdout);
-    res.json({ message: 'Model trained successfully!' });
-  } catch (err) {
-    console.error('Model training failed:', err);
-    res.status(500).json({ error: 'Model training failed' });
-  }
 });
-
-app.get('/predict', ...managersOnly, async (req, res) => {
 
 app.get('/predict', ...managersOnly, async (req, res) => {
   const { date } = req.query;
@@ -167,8 +162,8 @@ app.get('/predict', ...managersOnly, async (req, res) => {
   }
 });
 
-// 🧠 Schedule job to run daily at 2:00 AM
-cron.schedule('0 2 * * *', async () => { // runs every minute
+// Daily model training at 02:00 — run the script locally, do not call the public HTTP route
+cron.schedule('0 2 * * *', async () => {
   try {
     console.log('Running scheduled model training...');
     const stdout = await runPythonScript('train_model.py');
@@ -177,6 +172,29 @@ cron.schedule('0 2 * * *', async () => { // runs every minute
     console.error('Scheduled model training failed:', error.message);
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Start Express Server
 app.listen(PORT, () => {
