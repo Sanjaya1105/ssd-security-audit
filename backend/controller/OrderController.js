@@ -1144,6 +1144,14 @@ const updateOrderStatus = async (req, res) => {
             });
         }
 
+        // Authorization check: Prevent customers from updating orders
+        if (req.user && req.user.role !== 'admin' && req.user.role !== 'cashier') {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied'
+            });
+        }
+
         // Build update query based on provided fields
         let updateFields = [];
         let updateValues = [];
@@ -1191,12 +1199,9 @@ const updateOrderStatus = async (req, res) => {
         console.error('Error updating order:', error);
         res.status(500).json({
             success: false,
-            message: 'Error updating order',
-            error: error.message
-        });
+            message: 'Error updating order'});
     }
 };
-
 const deleteOrder = async (req, res) => {
     const db = req.db;
     const { id } = req.params;
