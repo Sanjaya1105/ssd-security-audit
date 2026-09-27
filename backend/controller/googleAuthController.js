@@ -3,259 +3,208 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 
-const STATE_COOKIE = "oauth_state";
-const TEN_MINUTES_MS = 10 * 60 * 1000;
-const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const REDIRECT_URI =
+    process.env.GOOGLE_REDIRECT_URI ||
+    "http://localhost:3000/api/users/auth/google/callback";
 
-function frontendBase() {
-    return (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
-}
-
-function googleConfigured() {
-    return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-}
-
-function createClient() {
+function getOAuthClient() {
     return new OAuth2Client(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URI
+        REDIRECT_URI
     );
 }
 
-function query(db, sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.query(sql, params, (err, results) => {
-            if (err) reject(err);
-            else resolve(results);
-        });
-    });
+function redirectWithError(res, reason){
+    const url = `${FRONTEND_URL}/login?oauth=error&reason=${encodeURIComponent(reason)}`;
+    return res.redirect(url);
 }
 
-function clearStateCookie(res) {
-    res.clearCookie(STATE_COOKIE, {
+function toClientUser(user) {
+    return {
+        id: user.user_id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        role: user.role,
+        address: user.address,
+        phone_number: user.phone_number
+    };
+}
+
+function setSessionCookie(res, user) {
+    const token = jwt.sign(
+        {
+            user_id: user.user_id,
+            email: user.email,
+            role: user.role
+        },
+        process.env.JWT_SECRET,
+        {
+            expiresIn: "3h",
+            algorithm: "HS256"
+        }
+    );
+
+    res.cookie("token", token, {
         httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        path: "/",
+        maxAge: 3 * 60 * 60 * 1000,
+        path: "/"
     });
-}
-
-function redirectLoginError(res, reason) {
-    if (res.headersSent) return;
-    clearStateCookie(res);
-    const url = new URL("/login", frontendBase());
-    url.searchParams.set("oauth", "error");
-    url.searchParams.set("reason", reason);
-    return res.redirect(url.toString());
-}
-
-function safeEqual(a, b) {
-    if (typeof a !== "string" || typeof b !== "string") return false;
-    if (a.length > 128 || b.length > 128) return false;
-    const left = Buffer.from(a);
-    const right = Buffer.from(b);
-    if (left.length !== right.length) return false;
-    return crypto.timingSafeEqual(left, right);
-}
-
-function phoneFromSub(sub) {
-    const digits = String(sub || "").replace(/\D/g, "");
-    const last10 = (digits || "0").slice(-10).padStart(10, "0");
-    return `g${last10}`;
 }
 
 async function ensureGoogleColumns(db) {
     const statements = [
         "ALTER TABLE user ADD COLUMN auth_provider VARCHAR(20) NOT NULL DEFAULT 'local'",
-        "ALTER TABLE user ADD COLUMN google_sub VARCHAR(255) NULL",
+        "ALTER TABLE user ADD COLUMN google_sub VARCHAR(255) NULL"
     ];
 
     for (const sql of statements) {
         try {
-            await query(db, sql);
+            await db.promise().execute(sql);
         } catch (err) {
             if (err.code !== "ER_DUP_FIELDNAME" && err.errno !== 1060) {
-                throw err;
+                console.error("Google OpenID schema update:", err.message);
             }
         }
     }
 }
 
-async function findOrCreateGoogleUser(db, payload) {
-    const sub = String(payload.sub);
-    const email = String(payload.email).trim();
-
-    const bySub = await query(db, "SELECT * FROM user WHERE google_sub = ? LIMIT 1", [sub]);
-    if (bySub.length > 0) {
-        return bySub[0];
-    }
-
-    const byEmail = await query(db, "SELECT * FROM user WHERE email = ? LIMIT 1", [email]);
-    if (byEmail.length > 0) {
-        await query(db, "UPDATE user SET google_sub = ? WHERE user_id = ?", [sub, byEmail[0].user_id]);
-        return { ...byEmail[0], google_sub: sub };
-    }
-
-    const firstName = payload.given_name && String(payload.given_name).trim()
-        ? String(payload.given_name).trim()
-        : "Google";
-    const lastName = payload.family_name && String(payload.family_name).trim()
-        ? String(payload.family_name).trim()
-        : "User";
-    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
-    const role = "customer";
-
-    const result = await query(
-        db,
-        "INSERT INTO user (first_name, last_name, address, phone_number, email, password, role, auth_provider, google_sub) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [firstName, lastName, "Signed in with Google", phoneFromSub(sub), email, passwordHash, role, "google", sub]
-    );
-
-    return {
-        user_id: result.insertId,
-        email,
-        role,
-    };
-}
-
-function issueSession(res, user) {
-    const token = jwt.sign(
-        {
-            user_id: user.user_id,
-            email: user.email,
-            role: user.role,
-        },
-        process.env.JWT_SECRET,
-        {
-            expiresIn: "3h",
-            algorithm: "HS256",
-        }
-    );
-
-    clearStateCookie(res);
-    res.cookie("token", token, {
-        httpOnly: true,
-        sameSite: "lax",
-        maxAge: THREE_HOURS_MS,
-        path: "/",
-    });
-    return res.redirect(`${frontendBase()}/auth/google/callback`);
+function googlePhonePlaceholder(sub) {
+    const digits = String(sub).replace(/\D/g, "").slice(-10).padStart(10, "0");
+    return `g${digits}`;
 }
 
 exports.startGoogleLogin = (req, res) => {
-    try {
-        if (!googleConfigured()) {
-            return redirectLoginError(res, "google_not_configured");
-        }
-
-        const state = crypto.randomBytes(32).toString("hex");
-        res.cookie(STATE_COOKIE, state, {
-            httpOnly: true,
-            sameSite: "lax",
-            maxAge: TEN_MINUTES_MS,
-            path: "/",
-        });
-
-        const client = createClient();
-        const url = client.generateAuthUrl({
-            access_type: "offline",
-            prompt: "consent",
-            scope: ["openid", "email", "profile"],
-            state,
-        });
-
-        return res.redirect(url);
-    } catch (err) {
-        console.error("Google login start error:", err && err.message ? err.message : err);
-        return redirectLoginError(res, "server_error");
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return redirectWithError(res, "google_not_configured");
     }
+
+    const state = crypto.randomBytes(24).toString("hex");
+    res.cookie("oauth_state", state, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 10 * 60 * 1000,
+        path: "/"
+    });
+
+    const url = getOAuthClient().generateAuthUrl({
+        access_type: "offline",
+        prompt: "consent",
+        scope: ["openid", "email", "profile"],
+        state
+    });
+
+    return res.redirect(url);
 };
 
 exports.handleGoogleCallback = async (req, res) => {
     try {
-        const code = req.query.code;
-        const state = req.query.state;
-        const error = req.query.error;
-        const expectedState = req.cookies ? req.cookies[STATE_COOKIE] : undefined;
+        const { code, state, error } = req.query;
 
         if (error) {
-            return redirectLoginError(res, "google_error");
+            return redirectWithError(res, String(error),);
         }
 
-        if (typeof state !== "string" || typeof expectedState !== "string" || !safeEqual(state, expectedState)) {
-            return redirectLoginError(res, "invalid_state");
+        if (!code || !state || state !== req.cookies.oauth_state) {
+            return redirectWithError(res, "invalid_state");
         }
 
-        if (!code || typeof code !== "string") {
-            return redirectLoginError(res, "missing_code");
-        }
+        res.clearCookie("oauth_state", { path: "/" });
 
-        if (!googleConfigured()) {
-            return redirectLoginError(res, "google_not_configured");
-        }
+        const client = getOAuthClient();
+        const { tokens } = await client.getToken(String(code));
 
-        const client = createClient();
-        const { tokens } = await client.getToken(code);
-        if (!tokens || !tokens.id_token) {
-            return redirectLoginError(res, "missing_id_token");
+        if (!tokens.id_token) {
+            return redirectWithError(res, "missing_id_token");
         }
 
         const ticket = await client.verifyIdToken({
             idToken: tokens.id_token,
-            audience: process.env.GOOGLE_CLIENT_ID,
+            audience: process.env.GOOGLE_CLIENT_ID
         });
+
         const payload = ticket.getPayload();
-
-        if (!payload || !payload.sub) {
-            return redirectLoginError(res, "invalid_token");
+        if (!payload?.email || payload.email_verified === false) {
+            return redirectWithError(res, "email_not_verified");
         }
 
-        if (!payload.email || payload.email_verified === false) {
-            return redirectLoginError(res, "email_not_verified");
+        const db = req.db;
+        await ensureGoogleColumns(db);
+
+        const email = payload.email;
+        const sub = payload.sub;
+        const firstName = payload.given_name || "Google";
+        const lastName = payload.family_name || "User";
+
+        const [bySub] = await db.promise().execute(
+            "SELECT * FROM user WHERE google_sub = ? LIMIT 1",
+            [sub]
+        );
+
+        let user = bySub[0];
+
+        if (!user) {
+            const [byEmail] = await db.promise().execute(
+                "SELECT * FROM user WHERE email = ? LIMIT 1",
+                [email]
+            );
+            user = byEmail[0];
+
+            if (user) {
+                await db.promise().execute(
+                    "UPDATE user SET google_sub = ?, auth_provider = CASE WHEN auth_provider = 'local' THEN 'local' ELSE 'google' END WHERE user_id = ?",
+                    [sub, user.user_id]
+                );
+            } else {
+                const hashedPassword = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+                const phone = googlePhonePlaceholder(sub);
+
+                const [insertResult] = await db.promise().execute(
+                    `INSERT INTO user (first_name, last_name, address, phone_number, email, password, role, auth_provider, google_sub)
+                     VALUES (?, ?, ?, ?, ?, ?, 'customer', 'google', ?)`,
+                    [firstName, lastName, "Signed in with Google", phone, email, hashedPassword, sub]
+                );
+
+                const [created] = await db.promise().execute(
+                    "SELECT * FROM user WHERE user_id = ?",
+                    [insertResult.insertId]
+                );
+                user = created[0];
+            }
         }
 
-        await ensureGoogleColumns(req.db);
-        const user = await findOrCreateGoogleUser(req.db, payload);
-        return issueSession(res, user);
+        setSessionCookie(res, user);
+        logSecurityEvent(
+            "OAUTH_SUCCESS",
+            { email: user.email, user_id: user.user_id, role: user.role },
+            req
+        );
+        return res.redirect(`${FRONTEND_URL}/auth/google/callback`);
     } catch (err) {
-        console.error("Google callback error:", err && err.message ? err.message : err);
-        return redirectLoginError(res, "server_error");
+        console.error("Google OpenID callback error:", err);
+        return redirectWithError(res, "oauth_failed", req);
     }
 };
 
 exports.getMe = (req, res) => {
     const db = req.db;
-    const userId = req.user && req.user.user_id;
-
-    if (!userId) {
-        return res.status(401).json({ message: "Unauthorized: No token provided" });
-    }
-
-    db.query(
-        "SELECT user_id, first_name, last_name, email, role, address, phone_number FROM user WHERE user_id = ? LIMIT 1",
-        [userId],
-        (err, rows) => {
+    db.execute(
+        "SELECT user_id, first_name, last_name, address, phone_number, email, role FROM user WHERE user_id = ?",
+        [req.user.user_id],
+        (err, results) => {
             if (err) {
-                console.error("getMe error:", err && err.message ? err.message : err);
+                console.error("getMe error:", err);
                 return res.status(500).json({ message: "Server Error" });
             }
-
-            if (!rows || rows.length === 0) {
-                return res.status(404).json({ message: "User not found" });
+            if (!results.length) {
+                return res.status(401).json({ message: "Unauthorized" });
             }
-
-            const user = rows[0];
-            return res.status(200).json({
-                user: {
-                    id: user.user_id,
-                    first_name: user.first_name,
-                    last_name: user.last_name,
-                    email: user.email,
-                    role: user.role,
-                    address: user.address,
-                    phone_number: user.phone_number,
-                },
-            });
+            res.status(200).json({ user: toClientUser(results[0]) });
         }
     );
 };
