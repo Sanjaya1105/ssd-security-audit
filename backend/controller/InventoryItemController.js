@@ -50,7 +50,7 @@ exports.createItem = async (req, res) => {
         });
     } catch (error) {
         console.error("Create Item Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -65,12 +65,12 @@ exports.getAllItems = async (req, res) => {
         db.execute(
             "SELECT * FROM inventory_item ORDER BY category, item_name",
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -88,7 +88,7 @@ exports.getItemById = async (req, res) => {
             "SELECT * FROM inventory_item WHERE item_id = ?",
             [itemId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
 
                 if (results.length === 0) {
                     return res.status(404).json({ message: "❌ Item not found" });
@@ -98,7 +98,7 @@ exports.getItemById = async (req, res) => {
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -160,7 +160,7 @@ exports.updateItem = async (req, res) => {
         res.status(200).json({ message: "✅ Inventory item updated successfully" });
     } catch (error) {
         console.error("Update Item Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -198,7 +198,7 @@ exports.deleteItem = async (req, res) => {
         res.status(200).json({ message: "✅ Inventory item deleted successfully" });
     } catch (error) {
         console.error("Delete Item Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -216,12 +216,12 @@ exports.getItemsByCategory = async (req, res) => {
             "SELECT * FROM inventory_item WHERE category = ? ORDER BY item_name",
             [category],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -236,12 +236,12 @@ exports.getAllCategories = async (req, res) => {
         db.execute(
             "SELECT DISTINCT category FROM inventory_item ORDER BY category",
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results.map(r => r.category));
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -292,6 +292,6 @@ exports.createCategory = async (req, res) => {
         });
     } catch (error) {
         console.error("Create Category Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 }; 

@@ -16,19 +16,16 @@ const Login = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (searchParams.get('oauth') !== 'error') return;
-
-    const reason = searchParams.get('reason');
-    const messages = {
-      google_not_configured: 'Google sign-in is not configured.',
-      invalid_state: 'Google sign-in could not be verified. Please try again.',
-      email_not_verified: 'Your Google email is not verified.',
-      google_error: 'Google sign-in was cancelled or denied.',
-    };
-    const message = messages[reason] || 'Google sign-in failed. Please try again.';
-    setError(message);
-    toast.error(message);
+    if (searchParams.get('oauth') === 'error') {
+      const reason = searchParams.get('reason') || 'Google sign-in failed';
+      setError(reason.replace(/_/g, ' '));
+      toast.error('Google sign-in failed');
+    }
   }, [searchParams]);
+
+  const startGoogleLogin = () => {
+    window.location.href = 'http://localhost:3000/api/users/auth/google';
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -261,9 +258,7 @@ const Login = () => {
               <div className="grid grid-cols-2 gap-3">
                 <motion.button
                   type="button"
-                  onClick={() => {
-                    window.location.href = 'http://localhost:3000/api/users/auth/google';
-                  }}
+                  onClick={startGoogleLogin}
                   className="py-2 px-4 bg-[#2a3441] rounded-lg text-sm text-gray-400 hover:bg-[#343d4a] transition-all duration-300"
                   whileHover={{ scale: 1.02, backgroundColor: "#343d4a" }}
                   whileTap={{ scale: 0.98 }}

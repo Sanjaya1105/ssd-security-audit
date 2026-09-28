@@ -13,7 +13,7 @@ const getAllRecipes = async (req, res) => {
         res.json(recipes);
     } catch (error) {
         console.error('Error fetching recipes:', error);
-        res.status(500).json({ message: 'Error fetching recipes', error: error.message });
+        res.status(500).json({ message: 'Error fetching recipes'});
     }
 };
 
@@ -38,7 +38,7 @@ const getRecipeByProductId = async (req, res) => {
         res.json(recipes);
     } catch (error) {
         console.error('Error fetching recipe:', error);
-        res.status(500).json({ message: 'Error fetching recipe', error: error.message });
+        res.status(500).json({ message: 'Error fetching recipe'});
     }
 };
 
@@ -74,7 +74,7 @@ const createRecipe = async (req, res) => {
         });
     } catch (error) {
         console.error('Error creating recipe:', error);
-        res.status(500).json({ message: 'Error creating recipe', error: error.message });
+        res.status(500).json({ message: 'Error creating recipe'});
     }
 };
 
@@ -108,7 +108,7 @@ const updateRecipe = async (req, res) => {
         res.json({ message: 'Recipe updated successfully' });
     } catch (error) {
         console.error('Error updating recipe:', error);
-        res.status(500).json({ message: 'Error updating recipe', error: error.message });
+        res.status(500).json({ message: 'Error updating recipe'});
     }
 };
 
@@ -136,7 +136,7 @@ const deleteRecipe = async (req, res) => {
         res.json({ message: 'Recipe deleted successfully' });
     } catch (error) {
         console.error('Error deleting recipe:', error);
-        res.status(500).json({ message: 'Error deleting recipe', error: error.message });
+        res.status(500).json({ message: 'Error deleting recipe'});
     }
 };
 

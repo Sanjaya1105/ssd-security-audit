@@ -93,9 +93,7 @@ exports.create = async (req, res) => {
         console.error('Error creating production log:', error);
         res.status(500).json({
             success: false,
-            message: 'Error creating production log',
-            error: error.message
-        });
+            message: 'Error creating production log'});
     }
 };
 
@@ -147,9 +145,7 @@ exports.getAll = async (req, res) => {
         console.error('Error fetching production logs:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching production logs',
-            error: error.message
-        });
+            message: 'Error fetching production logs'});
     }
 };
 
@@ -207,9 +203,7 @@ exports.getById = async (req, res) => {
         console.error('Error fetching production log:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching production log',
-            error: error.message
-        });
+            message: 'Error fetching production log'});
     }
 };
 
@@ -292,9 +286,7 @@ exports.update = async (req, res) => {
         console.error('Error updating production log:', error);
         res.status(500).json({
             success: false,
-            message: 'Error updating production log',
-            error: error.message
-        });
+            message: 'Error updating production log'});
     }
 };
 
@@ -377,9 +369,7 @@ exports.delete = async (req, res) => {
         console.error('Error deleting production log:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting production log',
-            error: error.message
-        });
+            message: 'Error deleting production log'});
     }
 };
 
@@ -405,9 +395,7 @@ exports.getProductStock = async (req, res) => {
         console.error('Error fetching product stock:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching product stock',
-            error: error.message
-        });
+            message: 'Error fetching product stock'});
     }
 };
 

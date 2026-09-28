@@ -1196,6 +1196,7 @@ const updateOrderStatus = async (req, res) => {
             message: 'Error updating order'});
     }
 };
+
 const deleteOrder = async (req, res) => {
     const db = req.db;
     const { id } = req.params;

@@ -58,10 +58,10 @@ const App = () => {
   const hideNavbarPaths = [
     "/login",
     "/signup",
-    "/auth",
     "/forget-password",
     "/verify-code",
     "/reset-password",
+    "/auth",
     "/order-confirmation",
     "/admin",
     "/cashier",

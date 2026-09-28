@@ -1,47 +1,47 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axiosInstance from '../config/axiosConfig';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import axiosInstance from "../config/axiosConfig";
+
+const redirectByRole = (navigate, role) => {
+  if (role === "admin" || role === "manager") {
+    navigate("/admin/dashboard", { replace: true });
+  } else if (role === "cashier") {
+    navigate("/cashier/dashboard", { replace: true });
+  } else {
+    navigate("/homeafterlogging", { replace: true });
+  }
+};
 
 const AuthGoogleCallback = () => {
   const navigate = useNavigate();
+  const [message, setMessage] = useState("Finishing Google sign-in...");
 
   useEffect(() => {
-    let active = true;
-
-    const finishGoogleLogin = async () => {
+    const finishLogin = async () => {
       try {
-        const response = await axiosInstance.get('/users/me');
-        const user = response.data.user;
-        localStorage.setItem('user', JSON.stringify(user));
-
-        if (!active) return;
-
-        if (user.role === 'admin' || user.role === 'manager') {
-          navigate('/admin/dashboard', { replace: true });
-        } else if (user.role === 'cashier') {
-          navigate('/cashier/dashboard', { replace: true });
-        } else {
-          navigate('/homeafterlogging', { replace: true });
+        const response = await axiosInstance.get("/users/me");
+        if (!response.data?.user) {
+          throw new Error("No user returned");
         }
-      } catch (error) {
-        console.error('Google session load failed:', error);
-        localStorage.removeItem('user');
-        if (active) {
-          navigate('/login?oauth=error', { replace: true });
-        }
+
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        toast.success("Signed in with Google");
+        redirectByRole(navigate, response.data.user.role);
+      } catch (err) {
+        console.error("Google callback failed:", err);
+        setMessage("Google sign-in failed. Redirecting to login...");
+        toast.error("Google sign-in failed");
+        navigate("/login?oauth=error", { replace: true });
       }
     };
 
-    finishGoogleLogin();
-
-    return () => {
-      active = false;
-    };
+    finishLogin();
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1a1d24] text-white">
-      Signing you in with Google...
+    <div className="min-h-screen flex items-center justify-center bg-[#1B2028] text-white">
+      <p className="text-sm text-gray-300">{message}</p>
     </div>
   );
 };

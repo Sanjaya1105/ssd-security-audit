@@ -160,7 +160,6 @@ const OrderConfirmation = () => {
                 )}
               </div>
 
-
               <div className="flex justify-end">
                 <button
                   onClick={() => navigate('/product-store')}

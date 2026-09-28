@@ -5,25 +5,28 @@ const { authenticateUser, optionalAuthenticate, authorizeRole } = require("../mi
 const { rateLimiter } = require("../middleware/rateLimiter");
 
 const router = express.Router();
+const managers = [authenticateUser, authorizeRole(["admin", "manager"])];
+const admins = [authenticateUser, authorizeRole(["admin"])];
 const authLimit = rateLimiter({ windowMs: 15 * 60 * 1000, max: 8, action: "auth" });
 
-
 // Public Routes
-router.post("/register", userController.createUser); // Create User
+router.post("/register", optionalAuthenticate, userController.createUser);
 router.post("/login", authLimit, userController.login);
-router.post("/logout", userController.logout); // Logout User
+router.post("/logout", userController.logout);
 router.post("/forget-password", authLimit, userController.forgetPassword);
 router.post("/verify-code", authLimit, userController.verifyCode);
 router.post("/reset-password", authLimit, userController.resetPassword);
+
+// Google OpenID Connect (authorization code grant)
 router.get("/auth/google", googleAuthController.startGoogleLogin);
 router.get("/auth/google/callback", googleAuthController.handleGoogleCallback);
-
-// Protected Routes
 router.get("/me", authenticateUser, googleAuthController.getMe);
-router.get("/users", authenticateUser, userController.getUsers); // Get All Users
-router.get("/users/:id", authenticateUser, userController.getUserById); // Get User by ID
-router.get("/users/role/:role", authenticateUser, userController.getUsersByRole); // Get Users by Role
-router.put("/users/:id", authenticateUser, userController.updateUser); // Update User
-router.delete("/users/:id", authenticateUser, userController.deleteUser); // Delete User
+
+// Protected Routes — /users/role/:role must stay above /users/:id
+router.get("/users", ...managers, userController.getUsers);
+router.get("/users/role/:role", ...managers, userController.getUsersByRole);
+router.get("/users/:id", authenticateUser, userController.getUserById);
+router.put("/users/:id", authenticateUser, userController.updateUser);
+router.delete("/users/:id", ...admins, userController.deleteUser);
 
 module.exports = router;

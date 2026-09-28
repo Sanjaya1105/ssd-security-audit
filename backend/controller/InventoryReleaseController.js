@@ -66,7 +66,7 @@ exports.createInventoryRelease = async (req, res) => {
         });
     } catch (error) {
         console.error("Create Inventory Release Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -88,12 +88,12 @@ exports.getAllInventoryReleases = async (req, res) => {
              LEFT JOIN inventory_item ii ON ir.item_id = ii.item_id
              ORDER BY ir.date_time DESC`,
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -118,7 +118,7 @@ exports.getInventoryReleaseById = async (req, res) => {
              WHERE ir.release_id = ?`,
             [releaseId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
 
                 if (results.length === 0) {
                     return res.status(404).json({ message: "❌ Inventory release not found" });
@@ -128,7 +128,7 @@ exports.getInventoryReleaseById = async (req, res) => {
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -150,12 +150,12 @@ exports.getInventoryReleasesByOrder = async (req, res) => {
              ORDER BY ir.date_time DESC`,
             [orderId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -242,7 +242,7 @@ exports.updateInventoryRelease = async (req, res) => {
         res.status(200).json({ message: "✅ Inventory release updated successfully" });
     } catch (error) {
         console.error("Update Inventory Release Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -280,6 +280,6 @@ exports.deleteInventoryRelease = async (req, res) => {
         res.status(200).json({ message: "✅ Inventory release deleted successfully" });
     } catch (error) {
         console.error("Delete Inventory Release Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 }; 

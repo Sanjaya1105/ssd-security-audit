@@ -1,10 +1,9 @@
 const express = require('express');
 const { PythonShell } = require('python-shell');
 const { authenticateUser, authorizeRole } = require('../middleware/AuthMiddleware');
-
+const router = express.Router();
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
-
 
 function isSafeIsoDate(value) {
   if (typeof value !== 'string' || !DATE_ONLY.test(value)) {
@@ -19,7 +18,6 @@ function isSafeIsoDate(value) {
   );
 }
 
-router.post('/predict-sales', authenticateUser, authorizeRole(['admin', 'manager']), (req, res) => {
 router.post('/predict-sales', authenticateUser, authorizeRole(['admin', 'manager']), (req, res) => {
   const { sale_date } = req.body;
   if (!isSafeIsoDate(sale_date)) {

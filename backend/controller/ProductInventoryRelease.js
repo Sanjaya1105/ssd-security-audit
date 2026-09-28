@@ -162,9 +162,7 @@ exports.create = async (req, res) => {
         console.error('Error releasing product inventory:', error);
         res.status(500).json({
             success: false,
-            message: 'Error releasing product inventory',
-            error: error.message
-        });
+            message: 'Error releasing product inventory'});
     }
 };
 
@@ -188,9 +186,7 @@ exports.getAll = async (req, res) => {
         console.error('Error fetching product inventory releases:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching product inventory releases',
-            error: error.message
-        });
+            message: 'Error fetching product inventory releases'});
     }
 };
 
@@ -239,9 +235,7 @@ exports.getById = async (req, res) => {
         console.error('Error fetching product inventory release:', error);
         res.status(500).json({
             success: false,
-            message: 'Error fetching product inventory release',
-            error: error.message
-        });
+            message: 'Error fetching product inventory release'});
     }
 };
 
@@ -332,9 +326,7 @@ exports.delete = async (req, res) => {
         console.error('Error deleting product inventory release:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting product inventory release',
-            error: error.message
-        });
+            message: 'Error deleting product inventory release'});
     }
 };
 

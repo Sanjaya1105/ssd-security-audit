@@ -3,15 +3,10 @@ import pandas as pd
 import sys
 import json
 import mysql.connector
-from datetime import datetime
+from db_config import mysql_config
 
-# Connect to MySQL
-conn = mysql.connector.connect(
-    host='localhost',
-    user='root',
-    password='ni@123',
-    database='hotandfast2'
-)
+# Connect to MySQL using credentials from backend/.env (not hardcoded)
+conn = mysql.connector.connect(**mysql_config())
 
 # Load model
 model = joblib.load('sales_model.pkl')

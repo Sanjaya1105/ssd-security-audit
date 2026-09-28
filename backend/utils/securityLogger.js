@@ -18,7 +18,7 @@ function logSecurityEvent(event, details = {}, req) {
         event,
         ip: clientIp(req),
         method: req?.method,
-        path: req?.originalUrl,
+        path: req?.originalUrl ? req.originalUrl.split('?')[0] : undefined,
         actor_id: req?.user?.user_id,
         actor_role: req?.user?.role,
         ...details

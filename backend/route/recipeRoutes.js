@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 const {
     getAllRecipes,
@@ -6,21 +6,15 @@ const {
     createRecipe,
     updateRecipe,
     deleteRecipe
-} = require('../controller/recipeController');
+} = require("../controller/recipeController");
+const { authenticateUser, authorizeRole } = require("../middleware/AuthMiddleware");
 
-// Get all recipes
-router.get('/', getAllRecipes);
+const managers = [authenticateUser, authorizeRole(["admin", "manager"])];
 
-// Get recipe by product ID
-router.get('/product/:productId', getRecipeByProductId);
+router.get("/", ...managers, getAllRecipes);
+router.get("/product/:productId", ...managers, getRecipeByProductId);
+router.post("/", ...managers, createRecipe);
+router.put("/:product_item_id/:ingredient_item_id", ...managers, updateRecipe);
+router.delete("/:product_item_id/:ingredient_item_id", ...managers, deleteRecipe);
 
-// Create new recipe
-router.post('/', createRecipe);
-
-// Update recipe
-router.put('/:product_item_id/:ingredient_item_id', updateRecipe);
-
-// Delete recipe
-router.delete('/:product_item_id/:ingredient_item_id', deleteRecipe);
-
-module.exports = router; 
+module.exports = router;

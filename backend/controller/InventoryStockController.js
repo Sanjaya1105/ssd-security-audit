@@ -80,7 +80,7 @@ exports.createStock = async (req, res) => {
         });
     } catch (error) {
         console.error("Create Stock Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -107,12 +107,12 @@ exports.getAllStock = async (req, res) => {
              JOIN purchase p ON s.purchase_id = p.purchase_id
              ORDER BY i.category, i.item_name`,
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -142,7 +142,7 @@ exports.getStockById = async (req, res) => {
              WHERE s.stock_id = ?`,
             [stockId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
 
                 if (results.length === 0) {
                     return res.status(404).json({ message: "❌ Stock entry not found" });
@@ -152,7 +152,7 @@ exports.getStockById = async (req, res) => {
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -183,12 +183,12 @@ exports.getStockByItemId = async (req, res) => {
              ORDER BY p.purchase_date`,
             [itemId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -249,7 +249,7 @@ exports.updateStock = async (req, res) => {
         res.status(200).json({ message: "✅ Stock quantity updated successfully" });
     } catch (error) {
         console.error("Update Stock Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -287,7 +287,7 @@ exports.deleteStock = async (req, res) => {
         res.status(200).json({ message: "✅ Stock entry deleted successfully" });
     } catch (error) {
         console.error("Delete Stock Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -316,7 +316,7 @@ exports.getTotalStockByItemId = async (req, res) => {
              GROUP BY i.item_id`,
             [itemId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
 
                 if (results.length === 0) {
                     return res.status(404).json({ message: "❌ Item not found" });
@@ -326,7 +326,7 @@ exports.getTotalStockByItemId = async (req, res) => {
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -425,6 +425,6 @@ exports.getStockAnalytics = async (req, res) => {
         });
     } catch (error) {
         console.error("Get Stock Analytics Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 }; 

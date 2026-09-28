@@ -61,7 +61,7 @@ exports.createProductionLog = async (req, res) => {
         });
     } catch (error) {
         console.error("Create Production Log Error:", error);
-        res.status(500).json({ message: "Server Error", error: error.message });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -77,12 +77,12 @@ exports.getAllProductionLogs = async (req, res) => {
              LEFT JOIN product_stock ps ON pl.product_id = ps.product_id
              ORDER BY pl.date_time DESC`,
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -101,7 +101,7 @@ exports.getProductionLogById = async (req, res) => {
              WHERE pl.production_id = ?`,
             [productionId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
 
                 if (results.length === 0) {
                     return res.status(404).json({ message: "❌ Production log not found" });
@@ -111,7 +111,7 @@ exports.getProductionLogById = async (req, res) => {
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -141,12 +141,12 @@ exports.getProductionLogsByProduct = async (req, res) => {
              ORDER BY pl.date_time DESC`,
             [productId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -176,12 +176,12 @@ exports.getProductionLogsByInventoryRelease = async (req, res) => {
              ORDER BY pl.date_time DESC`,
             [inventoryReleaseId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -208,7 +208,7 @@ exports.getProductStock = async (req, res) => {
              WHERE ps.product_id = ?`,
             [productId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
 
                 if (results.length === 0) {
                     return res.status(200).json({
@@ -223,6 +223,6 @@ exports.getProductStock = async (req, res) => {
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 }; 

@@ -1,33 +1,60 @@
-const hits = new Map();
+const jwt = require("jsonwebtoken");
 const { logSecurityEvent } = require("../utils/securityLogger");
 
-function rateLimiter({ windowMs = 15 * 60 * 1000, max = 8, action = "auth" } = {}) {
-    return (req, res, next) => {
-        const key = `${action}:${req.ip}`;
-        const now = Date.now();
-        const record = hits.get(key) || { count: 0, resetAt: now + windowMs };
+const authenticateUser = (req, res, next) => {
+    try {
+        const token = req.cookies.token || req.header("Authorization")?.replace("Bearer ", "");
 
-        if (now > record.resetAt) {
-            record.count = 0;
-            record.resetAt = now + windowMs;
+        if (!token) {
+            logSecurityEvent("AUTH_FAILURE", { reason: "no_token" }, req);
+            return res.status(401).json({ message: "Unauthorized: No token provided" });
         }
 
-        record.count += 1;
-        hits.set(key, record);
+        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+            if (err) {
+                logSecurityEvent("AUTH_FAILURE", { reason: "invalid_token" }, req);
+                return res.status(401).json({ message: "Unauthorized: Invalid token" });
+            }
 
-        if (record.count > max) {
+            req.user = decoded;
+            next();
+        });
+    } catch (error) {
+        logSecurityEvent("AUTH_FAILURE", { reason: "token_verification_failed" }, req);
+        res.status(401).json({ message: "Unauthorized: Token verification failed" });
+    }
+};
+
+// Lets public register still work, but an admin cookie can assign staff roles.
+const optionalAuthenticate = (req, res, next) => {
+    const token = req.cookies.token || req.header("Authorization")?.replace("Bearer ", "");
+    if (!token) {
+        return next();
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (!err) {
+            req.user = decoded;
+        }
+        next();
+    });
+};
+
+const authorizeRole = (roles) => {
+    return (req, res, next) => {
+        if (!req.user || !roles.includes(req.user.role)) {
             logSecurityEvent(
-                "ALERT_RATE_LIMIT",
-                { action, attempts: record.count },
+                "ACCESS_DENIED",
+                {
+                    required_roles: roles,
+                    reason: "insufficient_role"
+                },
                 req
             );
-            return res.status(429).json({
-                message: "Too many attempts. Please try again later."
-            });
+            return res.status(403).json({ message: "Forbidden: Insufficient permissions" });
         }
-
         next();
     };
-}
+};
 
-module.exports = { rateLimiter };
+module.exports = { authenticateUser, optionalAuthenticate, authorizeRole };

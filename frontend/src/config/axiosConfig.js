@@ -29,11 +29,7 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       // Handle unauthorized access
       localStorage.removeItem('user');
-      if (window.location.pathname.startsWith('/auth/google/callback')) {
-        window.location.href = '/login?oauth=error';
-      } else {
-        window.location.href = '/login';
-      }
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

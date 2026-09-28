@@ -76,12 +76,12 @@ exports.getAllFeedback = async (req, res) => {
              FROM feedback f 
              JOIN user u ON f.user_id = u.user_id`,
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -98,7 +98,7 @@ exports.getFeedbackById = async (req, res) => {
              WHERE f.feedback_id = ?`,
             [id],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 
                 if (results.length === 0) {
                     return res.status(404).json({ message: "❌ Feedback not found" });
@@ -108,7 +108,7 @@ exports.getFeedbackById = async (req, res) => {
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -125,12 +125,12 @@ exports.getFeedbackByUserId = async (req, res) => {
              WHERE f.user_id = ?`,
             [userId],
             (err, results) => {
-                if (err) return res.status(500).json({ message: "Server Error", error: err });
+                if (err) return res.status(500).json({ message: "Server Error" });
                 res.status(200).json(results);
             }
         );
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -148,7 +148,7 @@ exports.updateFeedback = async (req, res) => {
 
         // Check if feedback exists
         db.execute("SELECT * FROM feedback WHERE feedback_id = ?", [id], (err, results) => {
-            if (err) return res.status(500).json({ message: "Server Error", error: err });
+            if (err) return res.status(500).json({ message: "Server Error" });
 
             if (results.length === 0) {
                 return res.status(404).json({ message: "❌ Feedback not found" });
@@ -159,13 +159,13 @@ exports.updateFeedback = async (req, res) => {
                 "UPDATE feedback SET comment_ = ?, star_rating = ? WHERE feedback_id = ?",
                 [comment_, star_rating, id],
                 (err, result) => {
-                    if (err) return res.status(500).json({ message: "Server Error", error: err });
+                    if (err) return res.status(500).json({ message: "Server Error" });
                     res.status(200).json({ message: "✅ Feedback updated successfully" });
                 }
             );
         });
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 
@@ -183,7 +183,7 @@ exports.deleteFeedback = async (req, res) => {
 
         // ✅ Check if feedback exists
         db.execute("SELECT * FROM feedback WHERE feedback_id = ?", [id], (err, results) => {
-            if (err) return res.status(500).json({ message: "Server Error", error: err });
+            if (err) return res.status(500).json({ message: "Server Error" });
 
             if (results.length === 0) {
                 return res.status(404).json({ message: "❌ Feedback not found" });
@@ -194,13 +194,13 @@ exports.deleteFeedback = async (req, res) => {
                 "DELETE FROM feedback WHERE feedback_id = ?",
                 [id],
                 (err, result) => {
-                    if (err) return res.status(500).json({ message: "Server Error", error: err });
+                    if (err) return res.status(500).json({ message: "Server Error" });
                     res.status(200).json({ message: "✅ Feedback deleted successfully" });
                 }
             );
         });
     } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
+        res.status(500).json({ message: "Server Error"});
     }
 };
 

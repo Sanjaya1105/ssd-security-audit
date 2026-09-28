@@ -10,22 +10,14 @@ const {
     deleteInventoryRelease
 } = require("../controller/InventoryReleaseController");
 
-// Create new inventory release (Manager and Admin only)
-router.post("/", authenticateUser, createInventoryRelease);
+const staff = [authenticateUser, authorizeRole(["admin", "manager", "cashier"])];
+const managers = [authenticateUser, authorizeRole(["admin", "manager"])];
 
-// Get all inventory releases
-router.get("/", getAllInventoryReleases);
+router.post("/", ...managers, createInventoryRelease);
+router.get("/", ...staff, getAllInventoryReleases);
+router.get("/order/:orderId", ...staff, getInventoryReleasesByOrder);
+router.get("/:releaseId", ...staff, getInventoryReleaseById);
+router.put("/:releaseId", ...managers, updateInventoryRelease);
+router.delete("/:releaseId", ...managers, deleteInventoryRelease);
 
-// Get inventory releases by order ID
-router.get("/order/:orderId", getInventoryReleasesByOrder);
-
-// Get inventory release by ID
-router.get("/:releaseId", getInventoryReleaseById);
-
-// Update inventory release (Manager and Admin only)
-router.put("/:releaseId", authenticateUser, updateInventoryRelease);
-
-// Delete inventory release (Manager and Admin only)
-router.delete("/:releaseId", authenticateUser, deleteInventoryRelease);
-
-module.exports = router; 
+module.exports = router;
