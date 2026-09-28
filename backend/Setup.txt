@@ -1,0 +1,42 @@
+1. Install Dependencies
+Install the required packages by running the following command in your terminal:
+
+npm i node-cron axios nodemailer stripe python-shell
+
+2. Configure Environment Variables
+Create a new file named .env in the root directory of the project and add the following configuration. Replace the placeholder values with your actual credentials:
+
+# Database Configuration
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+DB_NAME=hotandfast2
+DB_PORT=3306
+
+# Authentication & Payments
+STRIPE_SECRET_KEY=your_stripe_secret_key
+JWT_SECRET=your_jwt_secret_key
+
+# Email Configuration
+EMAIL_USER=imeshliyanaarachchi9@gmail.com
+EMAIL_PASSWORD=your_email_app_password
+
+# Cloudinary (Frontend/Vite)
+VITE_CLOUDINARY_CLOUD_NAME=dgeeg9jao
+VITE_CLOUDINARY_UPLOAD_PRESET=unsigned_upload
+
+# Stripe (Frontend/Vite)
+VITE_STRIPE_PUBLIC_KEY=pk_test_51R79XM08R4TdFUYO5yR8lzqRj4Ff3ZpM6dmf6CBViV43MP0Bq65wbaA4ii3OxHsjbjrHDlcnbslFEX6EQqbJBEFH00EuVgip2A
+
+# Google OpenID Connect
+GOOGLE_CLIENT_ID=216183805458-n5uodr1117d78vvd76btsb0la66v2oaq.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/users/auth/google/callback
+FRONTEND_URL=http://localhost:5173
+3. Database Setup
+Log into your local MySQL server using your own credentials and execute the provided SQL script to construct the database schema and tables required for the application.
+
+4. Start the Application
+Once your database is running and your .env file is configured, start the server:
+
+npm start

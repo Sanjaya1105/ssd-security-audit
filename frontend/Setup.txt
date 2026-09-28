@@ -1,0 +1,21 @@
+1. Install Frontend Dependencies
+
+Run the following command in your frontend root directory:
+
+npm i react-icons axios antd @ant-design/icons dayjs date-fns recharts jspdf jspdf-autotable @stripe/stripe-js @stripe/react-stripe-js
+
+2. Configure Frontend Environment Variables
+
+Create or update the .env file in your frontend root directory with the following configuration:
+
+# Cloudinary Configuration
+VITE_CLOUDINARY_CLOUD_NAME=dgeeg9jao
+VITE_CLOUDINARY_UPLOAD_PRESET=unsigned_upload
+
+# Stripe Public Key
+VITE_STRIPE_PUBLIC_KEY=pk_test_51R79XM08R4TdFUYO5yR8lzqRj4Ff3ZpM6dmf6CBViV43MP0Bq65wbaA4ii3OxHsjbjrHDlcnbslFEX6EQqbJBEFH00EuVgip2A
+3. Run the Frontend Development Server
+
+Start your Vite development server:
+
+npm run dev
